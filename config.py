@@ -27,7 +27,7 @@ DATABASE = "sqlite:///database.sqlite3"
 #REDIS_SERVER = 'redis://localhost:6379'
 
 # Address to send system emails from
-EMAIL = "Testing CVE <taguette@example.com>"
+EMAIL = "Taguette Team <no-reply@taguette.com>"
 
 # Terms of service (HTML file)
 TOS_FILE = None
@@ -47,7 +47,7 @@ DEFAULT_LANGUAGE = 'en_US'
 MAIL_SERVER = {
     "ssl": False,
     "host": "localhost",
-    "port": 1025,
+    "port": 1025,   # for MailHog Local
 }
 
 # Whether users must explicitly accept cookies before using the website
