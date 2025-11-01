@@ -141,6 +141,8 @@ http://localhost:7465/new_password?reset_token=<captured_token>
 ```
 
 This opens the Set New Password form and allows the attacker to set a new password for the victim account.
+<img width="778" height="436" alt="Screenshot from 2025-11-01 01-09-27" src="https://github.com/user-attachments/assets/74f70f0a-df2a-401f-a0ef-5da78ff35324" />
+
 
 ---
 
