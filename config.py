@@ -2,7 +2,7 @@
 # It is a Python file, so you can use the full Python syntax
 
 # Name of this server
-NAME = "Misconfigured Taguette Server"
+NAME = "CVE_2025_6527 Taguette Demo Server"
 
 # Address and port to listen on
 BIND_ADDRESS = "0.0.0.0"
