@@ -78,6 +78,7 @@ curl -i -X POST 'http://127.0.0.1:7465/reset_password' \
 ```
 
 Go back to HogMail, and John should see a email reset link set by the Legit Taguette server but we have injected our domain into the based of the link (taguete.com).
+
 <img width="713" height="387" alt="image" src="https://github.com/user-attachments/assets/2862ea70-d69f-42bf-951d-1ee7df6643f8" />
 
 The legitmate domain was localhost:7465 
