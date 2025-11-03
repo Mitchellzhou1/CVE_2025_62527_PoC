@@ -11,7 +11,7 @@ body = """\
 Hello,
 
 Your password will expire soon!
-We require you to update it to maintain access to youunt. 
+We require you to update it to maintain access to your account. 
 Please update your password as soon as possible — otherwise, your account may be deactivated.
 
 We’ll send you a link shortly to complete the password update process.
